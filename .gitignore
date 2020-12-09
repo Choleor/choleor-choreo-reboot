@@ -1,6 +1,15 @@
-config.py
 __pycache__/
 templates/
 **/migrations/
 .idea/
 db.sqlite3
+templates/requirements.txt
+docker-compose.yml
+dockerfile
+.env
+todo
+configuration/
+choreo/services/selector.py
+Database_origin.csv
+migrations
+.docker/
