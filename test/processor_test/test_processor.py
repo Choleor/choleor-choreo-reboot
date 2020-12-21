@@ -122,4 +122,4 @@ class SelectorTest(TestCase):
 
     def test_score_based_selector(self):
         self.assertEquals(['2KBFD0aoZy8ㅡ27', '2i4zg9PzXYMㅡ14', '2r7RdcgdyB8ㅡ30', '4-TbQnONe_wㅡ14', '4h0ZEkI_onsㅡ22',
-                           '5tfQPuOQbRcㅡ28'], ScoreBasedSelector.select("a", []))
+                           '5tfQPuOQbRcㅡ28'], ScoreSelector.select("a", []))

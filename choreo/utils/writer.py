@@ -1,6 +1,6 @@
-import abc
-import sys
-from audio.utils.reader import *
+from choreo.utils.reader import *
+from abc import ABC
+import chardet
 from configuration.config import *
 
 
@@ -27,64 +27,103 @@ class TxtWriter(Writer):
 
 
 class CsvWriter(Writer):
-    def write(self, keys, file, out=None, **kwargs):
-        __dict__ = kwargs['dict']  # content  colname : [ctx1, ctx2, ctx3, ...]
-        __keys__ = list(__dict__.keys())
-        __vals__ = [__dict__[k] for k in __keys__]
+    def write(self, csv_in, **column_infos):
+        """
+        :param csv_in:
+        :param args: column name
+        :param column_infos: column name(key) ---- value lists (value)
+        :return:
+        """
+        # count row numbers
+        num_rows = 0
+        for row in open(csv_in):
+            num_rows += 1
 
-        with open(file, 'w', encoding="utf-8") as wf:
-            csv.DictWriter(wf, keys)
+        with open(csv_in, 'w', newline='') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=column_infos.keys())
+            writer.writeheader()
 
-    def append_new_column(self, file, out=None, **kwargs):
-        if not bool(out):
-            out = file
+            for v in column_infos.values():
+                writer.writerow({'': 'Baked', '': 'Beans'})
 
-        __dict__ = kwargs['dict']
-        (__keys__, __vals__) = (list(__dict__.keys()), list(__dict__.values()))
+    @staticmethod
+    def append_new_column(in_csv, out_csv, opt="end", **kwargs):
+        """
+        :param in_csv:
+        :param out_csv:
+        :param kwargs: key = new_col / value = col
+        :return:
+        """
+        with open(in_csv, 'r', encoding='cp1252') as input:
+            with open(out_csv, 'w', encoding='utf-8') as output:
+                writer = csv.writer(output, lineterminator='\n')
+                reader = csv.reader(input)
+                all = []
+                row = next(reader)
+                for new_c in kwargs:
+                    row = row + [new_c] if opt is "end" else [new_c] + row
+                row = [r.encode('UTF-8') for r in row]
+                all.append(row)
 
-        try:
-            arr = [{k: __dict__[k][i] for k in __keys__} for i in range(len(__vals__[0]))]
-            print(arr)
-            with open(file, 'r', encoding="utf-8") as rf, open(out, 'w', encoding="utf-8") as wf:
-                dict_reader = csv.DictReader(rf, delimiter='\t')
-                # 원하는 column 추가
-                org_fieldnames = dict_reader.fieldnames[0]
-                new_fieldnames = org_fieldnames + "," + ",".join(__keys__)
+                for row in reader:
+                    for val_c in kwargs.values():
+                        if opt is "end":
+                            row.append(val_c)
+                        else:
+                            row = [val_c] + row  # list item
+                    row = [r.encode('UTF-8') for r in row]
+                    all.append(row)
 
-                writer_csv = csv.DictWriter(wf, list(new_fieldnames.split(",")), delimiter=',', lineterminator='\n')
-                writer_csv.writeheader()
+                writer.writerows(all)
 
-                i = 0
-                for existed in dict_reader:
-                    rdict = {field: item for (field, item) in
-                             zip(org_fieldnames.split(","), existed[org_fieldnames].split(","))}
-                    rdict.update(arr[i]) if i < len(arr) else rdict
-                    writer_csv.writerow(rdict)
-                    print(rdict)
-                    i += 1
-            return 0
-        except FileNotFoundError:
-            sys.stderr.write("No such text file: %s\n" % file)
-            return 1
+    @staticmethod
+    def replace_column(_in_csv, _out_csv, _lambda=None, **kwargs):
+        """
+        :param _in_csv:
+        :param _out_csv:
+        :param _lambda: lambda to apply on existing value
+        :param kwargs: key () - value lists (nothing when there's lambda)
+        :return:
+        """
 
-#
-# test_path = "C:/Users/Jihee/PycharmProjects/choleor/audio/testfile/"
-#
-# if __name__ == '__main__':
-#     vid = ["rpLITtLRltw", "RQTgJRwMdKQ", "3pHYxx9dY_U", "jWhyc6UQ9ss", "jSrxXduIz1U"]
-#     url = ["https://www.youtube.com/watch?v=rpLITtLRltw", "https://www.youtube.com/watch?v=RQTgJRwMdKQ",
-#            "https://www.youtube.com/watch?v=3pHYxx9dY_U", "https://www.youtube.com/watch?v=jWhyc6UQ9ss",
-#            "https://www.youtube.com/watch?v=jSrxXduIz1U"]
-#     dd = {"choreo_vid": vid, "choreo_url": url}
-#     CsvWriter(test_path + "/ch_ReadTest.csv").append_new_column(out=test_path + "ch_WriteTest.csv", **{'dict': dd})
-#
-# if __name__ == '__main__':
-#     r = CsvReader(test_path + "test.csv").read(
-#         **{'col1': 'choreo_vid', 'col2': 'choreo_url', 'col3': 'start', 'col4': 'end'})
-#     a = [[vid, url, float(start), float(end)] for (vid, url, start, end) in
-#          zip(r['choreo_vid'], r['choreo_url'], r['start'], r['end'])]
-#     print(a)
-#
-#     os.chdir(c.LF_WAV)
-#     res = glob('*.{}'.format('wav'))
-#     print(res)
+        with open(_in_csv, 'r', encoding='utf-8') as input:
+            with open(_out_csv, 'w', encoding='utf-8') as output:
+                writer = csv.writer(output, lineterminator='\n')
+                reader = csv.reader(input)
+
+                col_idx_to_replace = {}  # ex "column1" : 4(th column) --> column's index
+                all = []
+                row = next(reader)
+
+                for idx, col_name in enumerate(row):
+                    if col_name in kwargs:
+                        col_idx_to_replace[col_name] = idx
+
+                all.append(row)
+
+                for row_idx, row in enumerate(reader):
+                    if _lambda is None:
+                        for column_name, value_lists in kwargs:
+                            row[col_idx_to_replace[column_name]] = value_lists[row_idx - 1]
+                    else:
+                        for column_name in kwargs.keys():
+                            row[col_idx_to_replace[column_name]] = _lambda(row[col_idx_to_replace[column_name]])
+                    all.append(row)
+
+                writer.writerows(all)
+
+    # @staticmethod
+    # def to_utf8(lst):
+    #     return [unicode(elem).encode('utf-8') for elem in lst]
+
+
+if __name__ == '__main__':
+    in_csv = "/home/jihee/choleor_media/choreo_copy.csv"
+    out_csv = "/home/jihee/choleor_media/choreo_final.csv"
+    CsvWriter.replace_column(in_csv, out_csv, lambda x: x.split("ㅡ")[0] + "ㅡ" + str(int(x.split("ㅡ")[1]) - 1),
+                             **{"choreo_slice_id": [0], "start_pose_id": [0], "end_pose_id": [0]})
+
+    with open("/home/jihee/choleor_media/choreo_final.csv", "r") as f:
+        file_data = f.readline()
+        print(file_data.encode())
+    print(chardet.detect(file_data.encode()))

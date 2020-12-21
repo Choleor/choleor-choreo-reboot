@@ -1,7 +1,9 @@
 import abc
-import csv
+import unicodecsv, csv
 import sys
 import re
+
+
 # import choreo.utils.modif_ds as dsutils
 
 
@@ -33,7 +35,7 @@ class CsvReader(Reader):
             __vals__ = []
             for col in __cols__:
                 with open(file, mode='r', encoding='utf-8') as f:
-                    __vals__.append([row[col] for row in csv.DictReader(f) if row[col] != ""])
+                    __vals__.append([row[col] for row in csv.DictReader(f)])
 
             _dict = {k: v for k, v in zip(__cols__, __vals__)}
             return _dict if not kwargs.get('lambda') else kwargs.get('lambda')(_dict)
@@ -47,8 +49,9 @@ class CsvReader(Reader):
 
     def read_all(self, file):
         with open(file, 'r', encoding="utf-8") as rf:
-            for row in csv.DictReader(rf, delimiter='\t'):
+            for row in unicodecsv.DictReader(rf, delimiter='\t'):
                 type(row)
+
 
 #
 test_path = "/home/jihee/choleor_media/"

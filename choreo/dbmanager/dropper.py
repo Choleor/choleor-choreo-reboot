@@ -1,5 +1,7 @@
 from choreo.dbmanager.initializer import *
+from choreo.utils.reader import TxtReader
 from choreo.utils.writer import TxtWriter
+from glob import glob
 
 
 class Dropper:
@@ -21,12 +23,12 @@ class Dropper:
             pass
 
         # youtube-dl의 archive file reformat
-        read = TxtReader().read(MEDIA_PATH + "archive.txt")
+        read = TxtReader().read("/home/jihee/choleor_media/audio/archive.txt")
         try:
             read.remove("youtube {}\n".format(choreo_id))
         except:
             pass
-        TxtWriter().write(MEDIA_PATH + "archive.txt", read)
+        TxtWriter().write("/home/jihee/choleor_media/audio/archive.txt", read)
         # self.audio_meta_list.remove(audio_id)
         # print(self.audio_meta_list)
 

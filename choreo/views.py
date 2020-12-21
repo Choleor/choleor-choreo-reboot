@@ -1,12 +1,19 @@
 from rest_framework.decorators import api_view
-from choreo.processor.choreography_manager import *
+# from choreo.processor.main_manager import *
+from choreo.services.choreography_manager import *
 import re
 import os
+from time import sleep
 import mimetypes
+import time, datetime
 from wsgiref.util import FileWrapper
-from django.http import FileResponse, StreamingHttpResponse
+from django.http import FileResponse, StreamingHttpResponse, HttpResponse, JsonResponse
+from choreo.processor.factory import Factory
 from choreo.external_handler.rabbitmq_handler import *
 from configuration.config import *
+
+
+# from choreo.processor.choreography_manager import *
 
 
 class RangeFileWrapper(object):
@@ -67,22 +74,119 @@ def stream_video(request, choreography_file):
 
 
 @api_view(['POST'])
-def resp(request):
+def video(request):
     """
-    :param request: user_id, selected_choreo_id, counter
+    :param request: user_id, selected_choreo_id, counter(1-), remark, request_n(1-6)
     :return: StreamingHttpResponse
     """
-    _args = (request.data.get('user_id'), request.data.get('selected_choreo_id'), request.data.get('counter'))
+    start = time.time()
+    tmp_dic = request.data
+    _args = (user_id, selected_choreo_id, counter, remark, request_n) = tmp_dic.get('user_id'), tmp_dic.get(
+        'selected_choreo_id'), int(tmp_dic.get('counter')), int(tmp_dic.get('remark')), tmp_dic.get('request_n')
+    print("REQUEST ARGUMENTS START")
+    print(_args)
+    print("REQUEST ARGUMENTS END")
+    my_val = None
 
-    # rabbit mq 에 작업을 완료한 사항이 있는지 확인
+    if request_n == 1:
+        _args = (user_id, selected_choreo_id, counter)
+        if remark == 0:
+            print("=============SELECT ON BODY===========")
+            strategy = BodyStrategy(*_args)
+        elif selected_choreo_id == "X":
+            print("=============SELECT ON INTRO===========")
+            strategy = IntroStrategy(*_args)
+        else:
+            print("=============SELECT ON BODY===========")
+            strategy = OutroStrategy(*_args)
+
+        my_val = ChoreographyManager(strategy).run_stgy()[0]
+        for i in range(3):
+            print("[NOTIFY FROM ROOT] I'm root process, this is the result")
+
+    else:
+        for i in range(100):
+            try:
+                resp = UserRedisHandler.dao.hget(user_id, str(request_n))
+                if resp.decode() != '0':
+                    my_val = UserRedisHandler.dao.hget(user_id, str(request_n)).decode()
+                    print(f"[NOTIFY FROM {request_n}] I'm other process, this is my result")
+                    print(my_val)
+                    break
+                else:
+                    sleep(1)
+            except Exception as e:
+                sleep(2)
+                continue
+
+    print("[THIS IS MY VALUE] here's my value : " + my_val)
+
+    partition = UserRedisHandler.dao.hget(user_id, "partition").decode()
+    audio_id, start_idx, counter = [x.decode() for x in
+                                    UserRedisHandler.dao.hmget(user_id, "audio_id", "start_idx", "counter")]
+    audio_slice_id = audio_id + "ㅡ" + str(int(start_idx) + int(counter) - 1)
+    # return HttpResponse(status=200)
+    print("start to produce...")
+    ret = Factory.produce(user_id, counter, partition, audio_slice_id, request_n, my_val)
+    print("partition" + partition + "audio slice id" + audio_slice_id, ret)
+    UserRedisHandler.dao.hset(user_id, str(request_n), '0')
+
+    print("hello, this is your execution time")
+    sec = time.time() - start
+    times = str(datetime.timedelta(seconds=sec)).split(".")[0]
+    print(times)
+    return set_file_response(f"/home/jihee/choleor_media/product/{user_id}/{counter}/Mㅡ{my_val}.mp4", my_val)
 
 
-    # 작업을 한 것이 없으면 아래의 코드 실행
-    if not bool(request.data.get('remark')):  # remark가 0이면 Intro 혹은 Outro
-        res = IntroManager(*_args).process() if _args[1] == "X" else BodyManager(*_args).process()
-    else:  # remark가 1이면 마지막 안무를 선택해야 할 경우
-        res = OutroManager(*_args).process()
-    # Rabbitmq에 저장
-    # response 보내고나서 celery로 directory 지우라고 시키기
-    for i in res:
-        return stream_video(request, i)
+@api_view(['POST'])
+def thumbnail(request):
+    start = time.time()
+    tmp = request.data
+    sel = None
+
+    counter = tmp['counter']
+    request_n = tmp['request_n']
+
+    for i in range(100):
+        try:
+            t = UserRedisHandler.dao.hget(tmp['user_id'], str(tmp['request_n']))
+            if t.decode() != '0':
+                sel = t.decode()
+                break
+            else:
+                sleep(1)
+        except Exception:
+            sleep(1)
+            continue
+
+    print("hello, this is your execution time")
+    sec = time.time() - start
+    times = str(datetime.timedelta(seconds=sec)).split(".")[0]
+    print(times)
+    print("before sending response")
+    print(f"/home/jihee/choleor_media/choreo/THUMBNAIL/{sel}.png")
+    return set_thumbnail_response(f"/home/jihee/choleor_media/choreo/THUMBNAIL/{sel}.png",
+                                  f"{sel}")
+
+
+def set_file_response(path, selected_choreo_id):
+    response = HttpResponse(open(path, "rb"))
+    response["Access-Control-Allow-Origin"] = "*"
+    response['Content-Type'] = "application/octet-stream"
+    response["choreo_id"] = selected_choreo_id
+    response['Content-Disposition'] = f'attachment; filename="final.mp4"'  # wav만 보내지 않아도 되도록
+    return response
+
+
+def set_thumbnail_response(img_path, img_name):
+    response = HttpResponse(open(img_path, "rb"))
+    response["Access-Control-Allow-Origin"] = "*"
+    response['Content-Type'] = "application/octet-stream"
+    response['Content-Disposition'] = f'attachment; filename="{img_name}.png"'  # wav만 보내지 않아도 되도록
+    return response
+
+
+@api_view(['POST'])
+def check(request):
+    return HttpResponse(status=200, content="choreo-server")
+

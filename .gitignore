@@ -13,3 +13,12 @@ choreo/services/selector.py
 Database_origin.csv
 migrations
 .docker/
+*.txt
+private.key
+ca_bundle.crt
+certificate.crt
+**/todo.md
+**/*.sql
+mysql-dockerfile
+**/processor/
+**/v.py

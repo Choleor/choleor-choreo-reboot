@@ -23,7 +23,7 @@ def func_getter(_func, *args, **kwargs):
 
 
 def normalize(unnormalized_list):
-    return list(map(lambda x: ((x - min(unnormalized_list)) / (max(unnormalized_list) - min(unnormalized_list))),
+    return list(map(lambda x: 60 + 40 * ((x - min(unnormalized_list)) / (max(unnormalized_list) - min(unnormalized_list))),
                     unnormalized_list))
 
 
@@ -65,4 +65,5 @@ def temp(x, y, *args, **kwargs):
 
 
 if __name__ == '__main__':
-    within_iteration(temp, 5, lambda_list=[(lambda x: x ** 2), (lambda y: y * 3)], args_list=[2, 4])
+    # within_iteration(temp, 5, lambda_list=[(lambda x: x ** 2), (lambda y: y * 3)], args_list=[2, 4])
+    print(normalize([1, 2, 3, 4, 5]))

@@ -1,5 +1,6 @@
 from pathlib import Path
 from configuration import config as c, mysql_config as mc, redis_config as rc
+from corsheaders.defaults import default_headers
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -10,9 +11,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = c.SECRET_KEY
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = ['*']
+
+SECURE_SSL_REDIRECT = False
 
 # Application definition
 
@@ -25,6 +28,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django.core.cache',
     'rest_framework',
+    'corsheaders',
+    'sslserver',
     'choreo'
 ]
 
@@ -34,6 +39,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -64,6 +70,7 @@ WSGI_APPLICATION = 'choleor_choreo.wsgi.application'
 DATABASES = {
     'default': mc.DB_INFO
 }
+
 CACHES = {
     "default": rc.REDIS_SELECTION_INFO,
     "user": rc.REDIS_USER_INFO,
@@ -71,6 +78,12 @@ CACHES = {
     "similarity": rc.REDIS_SMLR_INFO,
     "selection": rc.REDIS_SELECTION_INFO
 }
+
+CORS_EXPOSE_HEADERS = ["*"]
+CORS_ORIGIN_ALLOW_ALL = True
+CORS_ALLOW_HEADERS = default_headers + (
+    'Access-Control-Allow-Origin',
+)
 
 # Password validation
 # https://docs.djangoproject.com/en/3.1/ref/settings/#auth-password-validators
